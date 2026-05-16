@@ -193,30 +193,31 @@ public sealed class ClaudeService : IClaudeService
         }
 
         // Append conversation history, normalizing roles for the Anthropic API.
-        // Consecutive messages of the same role are merged to satisfy alternation requirement.
+        // Consecutive same-role messages are merged by accumulating blocks before committing
+        // the BetaMessageParam — avoids extracting content from the SDK's union type.
+        string? pendingRole = null;
+        var pendingBlocks = new List<BetaMsg.BetaContentBlockParam>();
+
+        void FlushPending()
+        {
+            if (pendingRole is null) return;
+            messages.Add(new BetaMsg.BetaMessageParam
+            {
+                Role    = pendingRole,
+                Content = new List<BetaMsg.BetaContentBlockParam>(pendingBlocks)
+            });
+            pendingRole = null;
+            pendingBlocks.Clear();
+        }
+
         foreach (var (role, content) in history)
         {
             var apiRole = role is "assistant" or "admin" ? "assistant" : "user";
-            if (messages.Count > 0 && messages[^1].Role == apiRole)
-            {
-                // Merge into the previous message
-                var prev    = messages[^1];
-                var merged  = ((IEnumerable<BetaMsg.BetaContentBlockParam>)prev.Content!).ToList();
-                merged.Add(new BetaMsg.BetaTextBlockParam { Text = content });
-                messages[^1] = new BetaMsg.BetaMessageParam { Role = apiRole, Content = merged };
-            }
-            else
-            {
-                messages.Add(new BetaMsg.BetaMessageParam
-                {
-                    Role    = apiRole,
-                    Content = new List<BetaMsg.BetaContentBlockParam>
-                    {
-                        new BetaMsg.BetaTextBlockParam { Text = content }
-                    }
-                });
-            }
+            if (pendingRole != apiRole) FlushPending();
+            pendingRole = apiRole;
+            pendingBlocks.Add(new BetaMsg.BetaTextBlockParam { Text = content });
         }
+        FlushPending();
 
         // Current user message
         messages.Add(new BetaMsg.BetaMessageParam
