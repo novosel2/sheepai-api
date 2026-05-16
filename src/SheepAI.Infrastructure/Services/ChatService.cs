@@ -63,6 +63,7 @@ public sealed class ChatService(
 
         var history = chat.Messages
             .OrderBy(m => m.CreatedAt)
+            .TakeLast(50)
             .Select(m => (m.Role, m.Content))
             .ToList();
 
