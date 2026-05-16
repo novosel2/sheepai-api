@@ -98,7 +98,8 @@ public sealed class ChatService(
         if (chat.Name is null)
             _ = GenerateAndSaveChatNameAsync(chatId, content);
 
-        _ = GenerateAndSaveChatSummaryAsync(chatId, fullHistory);
+        if (fullHistory.Count >= 2)
+            _ = GenerateAndSaveChatSummaryAsync(chatId, fullHistory);
 
         if (!chat.IsUrgent)
             _ = CheckAndUpdateUrgencyAsync(chatId, fullHistory);

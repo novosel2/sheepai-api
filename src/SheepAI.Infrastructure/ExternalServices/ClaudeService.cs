@@ -85,9 +85,11 @@ public sealed class ClaudeService : IClaudeService
             _logger.LogDebug("Generating chat name for first message");
 
         var prompt =
-            "Na temelju prve poruke građanina, osmisli kratki naziv razgovora (najviše 6 riječi). " +
-            "Naziv treba biti jasan i opisivati temu pitanja. " +
-            "Odgovori SAMO nazivom, bez navodnika ili ikakvih dodatnih objašnjenja.\n\n" +
+            "Na temelju poruke građanina, osmisli kratki naziv razgovora (najviše 6 riječi). " +
+            "Naziv treba biti jasan i opisivati konkretnu temu ili zahtjev.\n\n" +
+            "Ako je poruka pozdrav, uvreda, besmislica ili previše neodređena za smisleni naziv, " +
+            "odgovori SAMO riječju \"SKIP\" i ničim drugim.\n\n" +
+            "Inače odgovori SAMO nazivom, bez navodnika ili ikakvih dodatnih objašnjenja.\n\n" +
             $"Poruka: {firstMessage}";
 
         var response = await _client.Messages.Create(new MessageCreateParams
@@ -102,7 +104,10 @@ public sealed class ClaudeService : IClaudeService
             .OfType<TextBlock>()
             .FirstOrDefault()?.Text?.Trim() ?? string.Empty;
 
-        _logger.LogInformation("Generated chat name: {Name}", name);
+        if (name.Equals("SKIP", StringComparison.OrdinalIgnoreCase))
+            name = string.Empty;
+
+        _logger.LogInformation("Generated chat name: {Name}", string.IsNullOrEmpty(name) ? "(skipped)" : name);
         return name;
     }
 
@@ -116,8 +121,10 @@ public sealed class ClaudeService : IClaudeService
 
         var prompt =
             "Napiši sažetak sljedećeg razgovora između građanina i gradskog AI asistenta u 1-2 rečenice. " +
-            "Sažetak treba opisivati o čemu se radilo i je li problem riješen. " +
-            "Odgovori SAMO sažetkom, bez uvoda ili dodatnih komentara.\n\n" +
+            "Sažetak treba opisivati o čemu se radilo i je li problem riješen.\n\n" +
+            "Ako razgovor ne sadrži nikakav smislen zahtjev (npr. samo pozdravi, uvrede ili besmislice), " +
+            "odgovori SAMO riječju \"SKIP\" i ničim drugim.\n\n" +
+            "Inače odgovori SAMO sažetkom, bez uvoda ili dodatnih komentara.\n\n" +
             $"Razgovor:\n{transcript}";
 
         var response = await _client.Messages.Create(new MessageCreateParams
@@ -131,6 +138,9 @@ public sealed class ClaudeService : IClaudeService
             .Select(b => b.Value)
             .OfType<TextBlock>()
             .FirstOrDefault()?.Text?.Trim() ?? string.Empty;
+
+        if (summary.Equals("SKIP", StringComparison.OrdinalIgnoreCase))
+            summary = string.Empty;
 
         _logger.LogInformation("Generated chat summary ({Length} chars)", summary.Length);
         return summary;
