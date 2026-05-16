@@ -5,6 +5,7 @@ public sealed record ChatResponse(
     string Name,
     string Summary,
     DateTime CreatedAt,
+    bool IsFinished,
     bool IsUrgent,
     bool IsAdminTaken,
     DateTime LastMessageAt);

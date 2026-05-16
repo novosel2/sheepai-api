@@ -17,20 +17,8 @@ public sealed class ChatAdminService(
     {
         var chats = await db.Chats
             .AsNoTracking()
-            .Where(c => !c.IsFinished)
             .OrderByDescending(c => c.IsUrgent)
             .ThenByDescending(c => c.LastMessageAt)
-            .ToListAsync(ct);
-
-        return chats.Select(MapToResponse).ToList();
-    }
-
-    public async Task<List<ChatResponse>> GetFinishedChatsAsync(CancellationToken ct = default)
-    {
-        var chats = await db.Chats
-            .AsNoTracking()
-            .Where(c => c.IsFinished)
-            .OrderByDescending(c => c.LastMessageAt)
             .ToListAsync(ct);
 
         return chats.Select(MapToResponse).ToList();
@@ -69,6 +57,7 @@ public sealed class ChatAdminService(
             c.Name ?? $"Chat {c.Id.ToString()[..8]}",
             c.Summary ?? string.Empty,
             c.CreatedAt,
+            c.IsFinished,
             c.IsUrgent,
             c.IsAdminTaken,
             c.LastMessageAt);
