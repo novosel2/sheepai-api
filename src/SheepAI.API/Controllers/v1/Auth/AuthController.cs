@@ -10,7 +10,7 @@ namespace SheepAI.API.Controllers.v1.Auth;
 
 /// <summary>Handles user registration, login, token refresh, and logout.</summary>
 [ApiController]
-[Route("api/v1/auth")]
+[Route("api/admin")]
 public sealed class AuthController(IAuthService authService) : ControllerBase
 {
     /// <summary>Registers a new user and returns access + refresh tokens.</summary>
