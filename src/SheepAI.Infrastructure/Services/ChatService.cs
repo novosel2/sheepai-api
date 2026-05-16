@@ -50,9 +50,11 @@ public sealed class ChatService(
     public async Task<MessageResponse?> SendMessageAsync(Guid chatId, string content, CancellationToken ct = default)
     {
         var chat = await db.Chats
-            .Include(c => c.Messages)
             .FirstOrDefaultAsync(c => c.Id == chatId, ct)
             ?? throw new NotFoundException($"Chat {chatId} not found.");
+
+        if (chat.IsFinished)
+            throw new ValidationException("Chat has already been finished.");
 
         chat.LastMessageAt = DateTime.UtcNow;
 
@@ -68,11 +70,15 @@ public sealed class ChatService(
             return null;
         }
 
-        var history = chat.Messages
+        var history = await db.ChatMessages
+            .Where(m => m.ChatId == chatId)
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(50)
             .OrderBy(m => m.CreatedAt)
-            .TakeLast(50)
-            .Select(m => (m.Role, m.Content))
-            .ToList();
+            .Select(m => new { m.Role, m.Content })
+            .ToListAsync(ct);
+
+        var historyTuples = history.Select(m => (m.Role, m.Content)).ToList();
 
         List<string> fileIds;
         try
@@ -91,21 +97,22 @@ public sealed class ChatService(
 
         if (_logger.IsEnabled(LogLevel.Debug))
             _logger.LogDebug("Calling Claude for chat {ChatId} with {FileCount} docs and {HistoryCount} history turns",
-                chatId, fileIds.Count, history.Count);
+                chatId, fileIds.Count, historyTuples.Count);
 
-        var claudeResult = await claudeService.ChatWithDocumentsAsync(fileIds, history, content, ct);
+        var claudeResult = await claudeService.ChatWithDocumentsAsync(fileIds, historyTuples, content, ct);
 
         var assistantMsg = new ChatMessage { ChatId = chatId, Role = "assistant", Content = claudeResult.Text };
         db.ChatMessages.Add(assistantMsg);
         await db.SaveChangesAsync(ct);
 
-        var fullHistory = history
+        var fullHistory = historyTuples
             .Append((Role: "user", Content: content))
             .Append((Role: "assistant", Content: claudeResult.Text))
             .ToList();
 
         if (chat.Name is null)
             _ = GenerateAndSaveChatNameAsync(chatId, content);
+
 
         if (fullHistory.Count >= 2)
             _ = GenerateAndSaveChatSummaryAsync(chatId, fullHistory);
