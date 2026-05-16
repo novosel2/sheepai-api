@@ -53,5 +53,11 @@ public sealed class ChatAdminService(
     }
 
     private static ChatResponse MapToResponse(Chat c) =>
-        new(c.Id, c.Name, c.Summary, c.CreatedAt, c.IsUrgent, c.IsAdminTaken, c.LastMessageAt);
+        new(c.Id,
+            c.Name ?? $"Chat {c.Id.ToString()[..8]}",
+            c.Summary ?? string.Empty,
+            c.CreatedAt,
+            c.IsUrgent,
+            c.IsAdminTaken,
+            c.LastMessageAt);
 }

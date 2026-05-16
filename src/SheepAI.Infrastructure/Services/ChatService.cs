@@ -114,7 +114,10 @@ public sealed class ChatService(
             .FirstOrDefaultAsync(c => c.Id == chatId, ct)
             ?? throw new NotFoundException($"Chat {chatId} not found.");
 
-        return new ChatStatusResponse(chat.Name, chat.Summary, chat.IsAdminTaken);
+        return new ChatStatusResponse(
+            chat.Name ?? $"Chat {chat.Id.ToString()[..8]}",
+            chat.Summary ?? string.Empty,
+            chat.IsAdminTaken);
     }
 
     private async Task GenerateAndSaveChatSummaryAsync(Guid chatId, List<(string Role, string Content)> history)
