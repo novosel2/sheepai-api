@@ -37,12 +37,13 @@ public sealed class ChatsController(IChatService chatService) : ControllerBase
     /// </summary>
     [HttpPost("{chatId:guid}/messages")]
     [ProducesResponseType<ApiResponse<MessageResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SendMessage(Guid chatId, [FromBody] SendMessageRequest request, CancellationToken ct)
     {
         var response = await chatService.SendMessageAsync(chatId, request.Content, ct);
-        return Ok(Api.Data("Message sent.", response));
+        return response is null ? NoContent() : Ok(Api.Data("Message sent.", response));
     }
 
     /// <summary>

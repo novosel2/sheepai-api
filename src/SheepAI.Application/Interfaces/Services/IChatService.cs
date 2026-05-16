@@ -13,10 +13,11 @@ public interface IChatService
 
     /// <summary>
     /// Saves the user message and — if the chat has not been taken over by an admin —
-    /// calls Claude and returns the AI response. If admin has taken over, returns the
-    /// saved user message so the frontend can display it while waiting for admin reply.
+    /// calls Claude and returns the AI response.
+    /// Returns <c>null</c> when admin has taken over (message is saved but no response is generated;
+    /// the caller should return 204 so the frontend does not display a duplicate message).
     /// </summary>
-    Task<MessageResponse> SendMessageAsync(Guid chatId, string content, CancellationToken ct = default);
+    Task<MessageResponse?> SendMessageAsync(Guid chatId, string content, CancellationToken ct = default);
 
     /// <summary>Returns the admin-takeover status of the given chat.</summary>
     Task<ChatStatusResponse> GetStatusAsync(Guid chatId, CancellationToken ct = default);
