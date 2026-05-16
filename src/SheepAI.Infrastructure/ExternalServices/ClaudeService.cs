@@ -111,6 +111,43 @@ public sealed class ClaudeService : IClaudeService
         _logger.LogInformation("Document deleted from Files API: {FileId}", fileId);
     }
 
+    public async Task<bool> CheckUrgencyAsync(
+        IReadOnlyList<(string Role, string Content)> history,
+        CancellationToken ct = default)
+    {
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug("Checking urgency for conversation with {TurnCount} turns", history.Count);
+
+        var transcript = string.Join("\n", history.Select(h =>
+            $"{(h.Role == "user" ? "Građanin" : "Asistent")}: {h.Content}"));
+
+        var prompt =
+            "Procijeni je li sljedeći razgovor između građanina i gradskog AI asistenta hitan " +
+            "i zahtijeva li hitnu pažnju ljudskog administratora.\n\n" +
+            $"Razgovor:\n{transcript}\n\n" +
+            "Odgovori SAMO riječju \"urgent\" ili \"not_urgent\". " +
+            "Hitno znači da osoba ima vremenski osjetljiv problem, da je u nevolji, " +
+            "ili da joj je potrebna neposredna pomoć čovjeka.";
+
+        var response = await _client.Messages.Create(new MessageCreateParams
+        {
+            Model     = _options.DefaultModel,
+            MaxTokens = 10,
+            Messages  = [new MessageParam { Role = Role.User, Content = prompt }]
+        }, ct);
+
+        var answer = response.Content
+            .Select(b => b.Value)
+            .OfType<TextBlock>()
+            .FirstOrDefault()?.Text ?? string.Empty;
+
+        var isUrgent = answer.Contains("urgent", StringComparison.OrdinalIgnoreCase)
+                    && !answer.Contains("not_urgent", StringComparison.OrdinalIgnoreCase);
+
+        _logger.LogInformation("Urgency check result: {Result}", isUrgent ? "urgent" : "not_urgent");
+        return isUrgent;
+    }
+
     public async Task<ClaudeResult> ChatWithDocumentsAsync(
         IReadOnlyList<string> fileIds,
         IReadOnlyList<(string Role, string Content)> history,

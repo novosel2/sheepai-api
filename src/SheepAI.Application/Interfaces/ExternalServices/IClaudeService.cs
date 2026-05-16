@@ -31,4 +31,12 @@ public interface IClaudeService
         IReadOnlyList<(string Role, string Content)> history,
         string userMessage,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Checks whether a conversation is urgent and needs admin attention.
+    /// Intended to be called in the background after the chat response has already been returned.
+    /// </summary>
+    Task<bool> CheckUrgencyAsync(
+        IReadOnlyList<(string Role, string Content)> history,
+        CancellationToken ct = default);
 }

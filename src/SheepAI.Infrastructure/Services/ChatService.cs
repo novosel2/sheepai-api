@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SheepAI.Application.DTOs.Responses.Chats;
 using SheepAI.Application.Interfaces.ExternalServices;
@@ -12,16 +13,9 @@ namespace SheepAI.Infrastructure.Services;
 public sealed class ChatService(
     AppDbContext db,
     IClaudeService claudeService,
+    IServiceScopeFactory scopeFactory,
     ILogger<ChatService> logger) : IChatService
 {
-    // Urgency triggers: more than this many user messages, or content matches keywords.
-    private const int UrgencyMessageThreshold = 10;
-
-    private static readonly string[] UrgencyKeywords =
-    [
-        "hitno", "hitna", "hitni", "pomoć", "pomoc", "sos", "opasnost",
-        "nesreća", "nesreca", "upomoć", "upomoc", "žurno", "zurno", "urgent"
-    ];
 
     public async Task<CreateChatResponse> CreateChatAsync(CancellationToken ct = default)
     {
@@ -89,19 +83,17 @@ public sealed class ChatService(
 
         var assistantMsg = new ChatMessage { ChatId = chatId, Role = "assistant", Content = claudeResult.Text };
         db.ChatMessages.Add(assistantMsg);
+        await db.SaveChangesAsync(ct);
 
-        // Urgency check
+        // Fire urgency check in the background — response is already ready to return.
         if (!chat.IsUrgent)
         {
-            var userMessageCount = chat.Messages.Count(m => m.Role == "user") + 1; // +1 for current
-            if (userMessageCount >= UrgencyMessageThreshold || IsUrgentContent(content))
-            {
-                chat.IsUrgent = true;
-                logger.LogInformation("Chat {ChatId} flagged as urgent", chatId);
-            }
+            var historyForUrgency = history
+                .Append((Role: "user", Content: content))
+                .ToList();
+            _ = CheckAndUpdateUrgencyAsync(chatId, historyForUrgency);
         }
 
-        await db.SaveChangesAsync(ct);
         return MapToResponse(assistantMsg);
     }
 
@@ -115,14 +107,31 @@ public sealed class ChatService(
         return new ChatStatusResponse(chat.IsAdminTaken);
     }
 
+    private async Task CheckAndUpdateUrgencyAsync(Guid chatId, List<(string Role, string Content)> history)
+    {
+        try
+        {
+            var isUrgent = await claudeService.CheckUrgencyAsync(history);
+            if (!isUrgent) return;
+
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var scopedDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var chat = await scopedDb.Chats.FindAsync(chatId);
+            if (chat is { IsUrgent: false })
+            {
+                chat.IsUrgent = true;
+                await scopedDb.SaveChangesAsync();
+                logger.LogInformation("Chat {ChatId} flagged as urgent", chatId);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Background urgency check failed for chat {ChatId}", chatId);
+        }
+    }
+
     private static MessageResponse MapToResponse(ChatMessage m) =>
         new(m.Id, m.ChatId, m.Role, m.Content, m.CreatedAt);
-
-    private static bool IsUrgentContent(string content)
-    {
-        var lower = content.ToLowerInvariant();
-        return UrgencyKeywords.Any(kw => lower.Contains(kw));
-    }
 
     private ILogger<ChatService> _logger => logger;
 }
