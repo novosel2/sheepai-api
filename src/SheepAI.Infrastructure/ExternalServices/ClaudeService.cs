@@ -68,7 +68,8 @@ public sealed class ClaudeService : IClaudeService
             Description =
                 "Respond to the user. Always include a text response. Add widgets only when relevant: " +
                 "map — when the answer involves a specific location with known coordinates from the city documents; " +
-                "contact — when the answer involves a specific person or department with a phone number or email from the city documents.",
+                "contact — when the answer involves a specific person or department with a phone number or email from the city documents. " +
+                "Never include more than one contact widget and never more than one map widget in a single response.",
             InputSchema = BetaMsg.InputSchema.FromRawUnchecked(rawData)
         };
     }
@@ -335,7 +336,8 @@ public sealed class ClaudeService : IClaudeService
             "Odgovaraj jasno i ljubazno. " +
             "Uvijek odgovaraj pomoću alata 'respond'. " +
             "U polje 'widgets' dodaj map widget jedino ako odgovor uključuje konkretnu lokaciju ili adresu čije su koordinate poznate iz dokumenata. " +
-            "Kada odgovor uključuje kontakt podatke djelatnika ili odjela (ime, telefon, email) iz dokumenata, dodaj widget tipa 'contact' s tim podacima.";
+            "Kada odgovor uključuje kontakt podatke djelatnika ili odjela (ime, telefon, email) iz dokumenata, dodaj widget tipa 'contact' s tim podacima. " +
+            "Nikad ne vraćaj više od jednog contact widgeta i više od jednog map widgeta u jednom odgovoru.";
 
         List<BetaMsg.BetaTextBlockParam> systemBlocks =
         [
