@@ -51,16 +51,16 @@ public sealed class ClaudeService : IClaudeService
             (int)response.Usage.OutputTokens);
     }
 
-    public async Task<DocumentUploadResult> UploadDocumentAsync(Stream fileStream, string fileName, long sizeBytes, CancellationToken cancellationToken = default)
+    public async Task<DocumentUploadResult> UploadDocumentAsync(Stream fileStream, string fileName, string contentType, long sizeBytes, CancellationToken cancellationToken = default)
     {
         if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("Uploading document to Anthropic Files API: {FileName} ({SizeBytes} bytes)", fileName, sizeBytes);
+            _logger.LogDebug("Uploading document to Anthropic Files API: {FileName} ({SizeBytes} bytes, {ContentType})", fileName, sizeBytes, contentType);
 
         var fileContent = new BinaryContent
         {
             Stream = fileStream,
             FileName = fileName,
-            ContentType = new MediaTypeHeaderValue("application/pdf")
+            ContentType = new MediaTypeHeaderValue(contentType)
         };
         var uploaded = await _client.Beta.Files.Upload(new BetaFiles.FileUploadParams { File = fileContent }, cancellationToken);
 

@@ -23,7 +23,17 @@ public sealed class FilesController(IFileService fileService) : ControllerBase
         return Ok(Api.Data("Files retrieved.", files));
     }
 
-    /// <summary>Uploads a PDF to the Anthropic Files API and records it in the database.</summary>
+    private static readonly Dictionary<string, string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { ".pdf", "application/pdf" },
+        { ".txt", "text/plain" },
+        { ".md",  "text/plain" },
+    };
+
+    /// <summary>
+    /// Uploads a document to the Anthropic Files API and records it in the database.
+    /// Accepted formats: PDF, TXT, MD.
+    /// </summary>
     [HttpPost]
     [Consumes("multipart/form-data")]
     [ProducesResponseType<ApiResponse<FileResponse>>(StatusCodes.Status200OK)]
@@ -32,17 +42,17 @@ public sealed class FilesController(IFileService fileService) : ControllerBase
     public async Task<IActionResult> Upload(IFormFile file, [FromForm] string name, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
-            throw new ValidationException("A non-empty PDF file is required.");
+            throw new ValidationException("A non-empty file is required.");
 
-        if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
-            && !file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-            throw new ValidationException("Only PDF files are supported.");
+        var ext = Path.GetExtension(file.FileName);
+        if (!AllowedExtensions.TryGetValue(ext, out var contentType))
+            throw new ValidationException("Unsupported file type. Allowed: .pdf, .txt, .md");
 
         if (string.IsNullOrWhiteSpace(name))
             throw new ValidationException("Display name is required.");
 
         await using var stream = file.OpenReadStream();
-        var result = await fileService.UploadAsync(stream, file.FileName, name, file.Length, ct);
+        var result = await fileService.UploadAsync(stream, file.FileName, contentType, name, file.Length, ct);
         return Ok(Api.Data("File uploaded.", result));
     }
 

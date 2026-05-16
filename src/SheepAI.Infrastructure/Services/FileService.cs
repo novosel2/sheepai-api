@@ -27,6 +27,7 @@ public sealed class FileService(
     public async Task<FileResponse> UploadAsync(
         Stream fileStream,
         string fileName,
+        string contentType,
         string displayName,
         long sizeBytes,
         CancellationToken ct = default)
@@ -34,7 +35,7 @@ public sealed class FileService(
         if (_logger.IsEnabled(LogLevel.Debug))
             _logger.LogDebug("Uploading file {FileName} ({Size} bytes)", fileName, sizeBytes);
 
-        var uploadResult = await claudeService.UploadDocumentAsync(fileStream, fileName, sizeBytes, ct);
+        var uploadResult = await claudeService.UploadDocumentAsync(fileStream, fileName, contentType, sizeBytes, ct);
 
         var cityFile = new CityFile
         {
