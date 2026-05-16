@@ -46,6 +46,16 @@ public sealed class ChatsController(IChatService chatService) : ControllerBase
         return response is null ? NoContent() : Ok(Api.Data("Message sent.", response));
     }
 
+    /// <summary>Marks the chat as finished. Idempotent — safe to call multiple times.</summary>
+    [HttpPost("{chatId:guid}/finish")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> FinishChat(Guid chatId, CancellationToken ct)
+    {
+        await chatService.FinishChatAsync(chatId, ct);
+        return NoContent();
+    }
+
     /// <summary>
     /// Returns whether an admin has taken over this chat.
     /// Intended for client-side polling so the citizen knows to stop expecting AI replies.

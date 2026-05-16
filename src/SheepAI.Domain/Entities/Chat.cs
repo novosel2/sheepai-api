@@ -6,6 +6,7 @@ public sealed class Chat
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public string? Name { get; set; }
     public string? Summary { get; set; }
+    public bool IsFinished { get; set; } = false;
     public bool IsUrgent { get; set; } = false;
     public bool IsAdminTaken { get; set; } = false;
     public DateTime LastMessageAt { get; set; } = DateTime.UtcNow;

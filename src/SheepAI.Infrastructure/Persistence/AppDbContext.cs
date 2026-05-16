@@ -40,6 +40,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             e.HasKey(c => c.Id);
             e.Property(c => c.CreatedAt).IsRequired();
+            e.Property(c => c.IsFinished).IsRequired().HasDefaultValue(false);
             e.Property(c => c.IsUrgent).IsRequired().HasDefaultValue(false);
             e.Property(c => c.IsAdminTaken).IsRequired().HasDefaultValue(false);
             e.Property(c => c.LastMessageAt).IsRequired();

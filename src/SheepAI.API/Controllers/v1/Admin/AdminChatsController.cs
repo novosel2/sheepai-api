@@ -14,7 +14,7 @@ namespace SheepAI.API.Controllers.v1.Admin;
 [Route("api/admin/chats")]
 public sealed class AdminChatsController(IChatAdminService chatAdminService) : ControllerBase
 {
-    /// <summary>Returns all chat sessions, urgent ones first, then by most recent activity.</summary>
+    /// <summary>Returns active (non-finished) chat sessions, urgent ones first, then by most recent activity.</summary>
     [HttpGet]
     [ProducesResponseType<ApiResponse<List<ChatResponse>>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
@@ -22,6 +22,16 @@ public sealed class AdminChatsController(IChatAdminService chatAdminService) : C
     {
         var chats = await chatAdminService.GetAllChatsAsync(ct);
         return Ok(Api.Data("Chats retrieved.", chats));
+    }
+
+    /// <summary>Returns finished chat sessions ordered by most recent activity.</summary>
+    [HttpGet("finished")]
+    [ProducesResponseType<ApiResponse<List<ChatResponse>>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetFinished(CancellationToken ct)
+    {
+        var chats = await chatAdminService.GetFinishedChatsAsync(ct);
+        return Ok(Api.Data("Finished chats retrieved.", chats));
     }
 
     /// <summary>

@@ -6,8 +6,11 @@ namespace SheepAI.Application.Interfaces.Services;
 /// <summary>Admin-side chat operations: listing, takeover, and manual messaging.</summary>
 public interface IChatAdminService
 {
-    /// <summary>Returns all chat sessions ordered by urgency then last activity.</summary>
+    /// <summary>Returns active (non-finished) chat sessions ordered by urgency then last activity.</summary>
     Task<List<ChatResponse>> GetAllChatsAsync(CancellationToken ct = default);
+
+    /// <summary>Returns finished chat sessions ordered by most recent activity.</summary>
+    Task<List<ChatResponse>> GetFinishedChatsAsync(CancellationToken ct = default);
 
     /// <summary>Marks the chat as admin-taken, disabling AI responses for that session.</summary>
     Task TakeOverAsync(Guid chatId, CancellationToken ct = default);

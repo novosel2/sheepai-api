@@ -120,6 +120,19 @@ public sealed class ChatService(
             chat.IsAdminTaken);
     }
 
+    public async Task FinishChatAsync(Guid chatId, CancellationToken ct = default)
+    {
+        var chat = await db.Chats.FindAsync([chatId], ct)
+            ?? throw new NotFoundException($"Chat {chatId} not found.");
+
+        if (chat.IsFinished) return;
+
+        chat.IsFinished = true;
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("Chat {ChatId} marked as finished", chatId);
+    }
+
     private async Task GenerateAndSaveChatSummaryAsync(Guid chatId, List<(string Role, string Content)> history)
     {
         try

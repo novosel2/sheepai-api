@@ -21,4 +21,7 @@ public interface IChatService
 
     /// <summary>Returns the admin-takeover status of the given chat.</summary>
     Task<ChatStatusResponse> GetStatusAsync(Guid chatId, CancellationToken ct = default);
+
+    /// <summary>Marks the chat as finished. Idempotent.</summary>
+    Task FinishChatAsync(Guid chatId, CancellationToken ct = default);
 }
