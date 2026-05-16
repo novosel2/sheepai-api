@@ -59,6 +59,7 @@ public static class ConfigureServicesExtension
         // Services
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IChatService, ChatService>();
+        services.AddScoped<IChatAdminService, ChatAdminService>();
         services.AddScoped<IFileService, FileService>();
         services.AddSingleton<IClaudeService, ClaudeService>();
 
