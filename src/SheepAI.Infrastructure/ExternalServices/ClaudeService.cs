@@ -160,7 +160,8 @@ public sealed class ClaudeService : IClaudeService
         var messages = new List<BetaMsg.BetaMessageParam>();
 
         // Inject all documents as the first turn so they are available for the whole conversation.
-        // Using cache_control ephemeral to enable prompt caching on the document blocks.
+        // Cache breakpoint 2 sits on the trailing text block — everything above it (all doc refs)
+        // is served from cache on subsequent requests as long as the document list doesn't change.
         if (fileIds.Count > 0)
         {
             var docBlocks = new List<BetaMsg.BetaContentBlockParam>();
@@ -169,9 +170,11 @@ public sealed class ClaudeService : IClaudeService
                 BetaMsg.BetaRequestDocumentBlockSource src = new BetaMsg.BetaFileDocumentSource { FileID = id };
                 docBlocks.Add(new BetaMsg.BetaRequestDocumentBlock { Source = src });
             }
+            // Cache breakpoint 2 — placed here so all document blocks above are cached together.
             docBlocks.Add(new BetaMsg.BetaTextBlockParam
             {
-                Text = "Ovo su gradski dokumenti Grada Splita koji su ti na raspolaganju za odgovaranje na pitanja građana."
+                Text = "Ovo su gradski dokumenti Grada Splita koji su ti na raspolaganju za odgovaranje na pitanja građana.",
+                CacheControl = new BetaMsg.BetaCacheControlEphemeral()
             });
 
             messages.Add(new BetaMsg.BetaMessageParam
@@ -225,7 +228,9 @@ public sealed class ClaudeService : IClaudeService
             }
         });
 
-        const string systemPrompt =
+        // Cache breakpoint 1 on the system prompt — it never changes, so it is always served
+        // from cache after the very first request (charged at 10% of normal input token cost).
+        const string systemPromptText =
             "Ti si AI asistent Grada Splita. Pomažeš građanima i turistima s pitanjima o gradskim uslugama, " +
             "administrativnim zahtjevima i informacijama o gradu. " +
             "Odgovaraj isključivo na temelju priloženih gradskih dokumenata. " +
@@ -236,11 +241,16 @@ public sealed class ClaudeService : IClaudeService
             "Ako korisnik piše nekim jezikom koji je sličan ili blizak hrvatskom, uvijek odgovaraj na hrvatskom. " +
             "Odgovaraj jasno i ljubazno.";
 
+        List<BetaMsg.BetaTextBlockParam> systemBlocks =
+        [
+            new() { Text = systemPromptText, CacheControl = new BetaMsg.BetaCacheControlEphemeral() }
+        ];
+
         var response = await _client.Beta.Messages.Create(new BetaMsg.MessageCreateParams
         {
             Model     = _options.DefaultModel,
             MaxTokens = _options.MaxTokens,
-            System    = systemPrompt,
+            System    = systemBlocks,
             Messages  = messages,
             Betas     = ["files-api-2025-04-14"]
         }, ct);
