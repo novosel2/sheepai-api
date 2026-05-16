@@ -69,38 +69,6 @@ public sealed class ClaudeService : IClaudeService
         return new DocumentUploadResult(uploaded.ID, fileName, sizeBytes);
     }
 
-    public async Task<ClaudeResult> AnalyzeDocumentAsync(string fileId, string prompt, CancellationToken cancellationToken = default)
-    {
-        if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("Analyzing document {FileId} with Claude (model: {Model})", fileId, _options.DefaultModel);
-
-        BetaMsg.BetaRequestDocumentBlockSource docSource = new BetaMsg.BetaFileDocumentSource { FileID = fileId };
-        BetaMsg.BetaContentBlockParam docContent = new BetaMsg.BetaRequestDocumentBlock { Source = docSource };
-        BetaMsg.BetaContentBlockParam textContent = new BetaMsg.BetaTextBlockParam { Text = prompt };
-        BetaMsg.BetaMessageParamContent msgContent = new List<BetaMsg.BetaContentBlockParam> { docContent, textContent };
-
-        var response = await _client.Beta.Messages.Create(new BetaMsg.MessageCreateParams
-        {
-            Model = _options.DefaultModel,
-            MaxTokens = _options.MaxTokens,
-            Messages = [new BetaMsg.BetaMessageParam { Role = "user", Content = msgContent }],
-            Betas = ["files-api-2025-04-14"]
-        }, cancellationToken);
-
-        var text = response.Content
-            .Select(b => b.Value)
-            .OfType<BetaMsg.BetaTextBlock>()
-            .FirstOrDefault()?.Text ?? string.Empty;
-
-        _logger.LogInformation("Document analysis complete ({InputTokens} in, {OutputTokens} out)",
-            response.Usage.InputTokens, response.Usage.OutputTokens);
-
-        return new ClaudeResult(
-            text,
-            (int)response.Usage.InputTokens,
-            (int)response.Usage.OutputTokens);
-    }
-
     public async Task DeleteDocumentAsync(string fileId, CancellationToken cancellationToken = default)
     {
         if (_logger.IsEnabled(LogLevel.Debug))
