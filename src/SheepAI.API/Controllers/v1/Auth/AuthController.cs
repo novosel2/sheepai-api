@@ -8,12 +8,12 @@ using SheepAI.Application.Interfaces.Services;
 
 namespace SheepAI.API.Controllers.v1.Auth;
 
-/// <summary>Handles user registration, login, token refresh, and logout.</summary>
+/// <summary>Handles admin authentication — registration, login, and logout.</summary>
 [ApiController]
 [Route("api/admin")]
 public sealed class AuthController(IAuthService authService) : ControllerBase
 {
-    /// <summary>Registers a new user and returns access + refresh tokens.</summary>
+    /// <summary>Registers a new admin user and returns an access token.</summary>
     [HttpPost("register")]
     [ProducesResponseType<ApiResponse<AuthResponse>>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -24,7 +24,7 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return Created(string.Empty, Api.Data("Registered successfully.", result));
     }
 
-    /// <summary>Authenticates a user and returns access + refresh tokens.</summary>
+    /// <summary>Authenticates an admin user and returns an access token.</summary>
     [HttpPost("login")]
     [ProducesResponseType<ApiResponse<AuthResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
@@ -34,24 +34,14 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return Ok(Api.Data("Logged in.", result));
     }
 
-    /// <summary>Issues new tokens in exchange for a valid refresh token.</summary>
-    [HttpPost("refresh")]
-    [ProducesResponseType<ApiResponse<AuthResponse>>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Refresh([FromBody] RefreshRequest request, CancellationToken ct)
-    {
-        var result = await authService.RefreshAsync(request.Token, ct);
-        return Ok(Api.Data("Token refreshed.", result));
-    }
-
-    /// <summary>Invalidates all sessions for the current user and blocklists the access token.</summary>
+    /// <summary>Blocklists the current access token so it cannot be reused after logout.</summary>
     [Authorize]
     [HttpPost("logout")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
-        var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? User.FindFirst("sub")!.Value);
         var accessToken = HttpContext.Request.Headers.Authorization.ToString()["Bearer ".Length..];
         await authService.LogoutAsync(userId, accessToken, ct);

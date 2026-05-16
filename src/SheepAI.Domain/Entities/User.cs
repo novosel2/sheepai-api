@@ -7,5 +7,4 @@ public sealed class User
     public required string PasswordHash { get; set; }
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
-    public ICollection<RefreshToken> RefreshTokens { get; init; } = [];
 }

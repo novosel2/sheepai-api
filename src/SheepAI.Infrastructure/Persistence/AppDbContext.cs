@@ -6,7 +6,6 @@ namespace SheepAI.Infrastructure.Persistence;
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
-    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Chat> Chats => Set<Chat>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<CityFile> Files => Set<CityFile>();
@@ -21,19 +20,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(u => u.PasswordHash).IsRequired();
             e.Property(u => u.CreatedAt).IsRequired();
 
-            e.HasMany(u => u.RefreshTokens)
-                .WithOne(rt => rt.User)
-                .HasForeignKey(rt => rt.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<RefreshToken>(e =>
-        {
-            e.HasKey(rt => rt.Id);
-            e.Property(rt => rt.Token).IsRequired();
-            e.HasIndex(rt => rt.Token).IsUnique();
-            e.Property(rt => rt.ExpiresAt).IsRequired();
-            e.Property(rt => rt.CreatedAt).IsRequired();
         });
 
         modelBuilder.Entity<Chat>(e =>

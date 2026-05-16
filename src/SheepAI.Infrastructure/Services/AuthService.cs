@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -42,7 +41,7 @@ public sealed class AuthService(
 
         logger.LogInformation("User {UserId} registered.", user.Id);
 
-        return await IssueTokensAsync(user, ct);
+        return IssueToken(user);
     }
 
     /// <inheritdoc/>
@@ -55,38 +54,12 @@ public sealed class AuthService(
 
         logger.LogInformation("User {UserId} logged in.", user.Id);
 
-        return await IssueTokensAsync(user, ct);
-    }
-
-    /// <inheritdoc/>
-    public async Task<AuthResponse> RefreshAsync(string refreshToken, CancellationToken ct = default)
-    {
-        var stored = await db.RefreshTokens
-            .Include(rt => rt.User)
-            .FirstOrDefaultAsync(rt => rt.Token == refreshToken, ct);
-
-        if (stored is null || stored.ExpiresAt < DateTime.UtcNow)
-        {
-            if (stored is not null)
-                db.RefreshTokens.Remove(stored);
-            await db.SaveChangesAsync(ct);
-            throw new UnauthorizedException("Refresh token is invalid or expired.");
-        }
-
-        db.RefreshTokens.Remove(stored);
-        await db.SaveChangesAsync(ct);
-
-        return await IssueTokensAsync(stored.User, ct);
+        return IssueToken(user);
     }
 
     /// <inheritdoc/>
     public async Task LogoutAsync(Guid userId, string accessToken, CancellationToken ct = default)
     {
-        await db.RefreshTokens
-            .Where(rt => rt.UserId == userId)
-            .ExecuteDeleteAsync(ct);
-
-        // Blocklist the access token's jti for its remaining lifetime
         try
         {
             var jwt = new JwtSecurityTokenHandler().ReadJwtToken(accessToken);
@@ -101,24 +74,7 @@ public sealed class AuthService(
         }
     }
 
-    private async Task<AuthResponse> IssueTokensAsync(User user, CancellationToken ct)
-    {
-        var accessToken = GenerateAccessToken(user);
-        var refreshToken = GenerateRefreshToken();
-
-        db.RefreshTokens.Add(new RefreshToken
-        {
-            UserId    = user.Id,
-            Token     = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddDays(_jwt.RefreshTokenExpiryDays)
-        });
-
-        await db.SaveChangesAsync(ct);
-
-        return new AuthResponse(accessToken, refreshToken, _jwt.ExpiresInMinutes * 60);
-    }
-
-    private string GenerateAccessToken(User user)
+    private AuthResponse IssueToken(User user)
     {
         var claims = new[]
         {
@@ -137,9 +93,6 @@ public sealed class AuthService(
             expires:            DateTime.UtcNow.AddMinutes(_jwt.ExpiresInMinutes),
             signingCredentials: creds);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return new AuthResponse(new JwtSecurityTokenHandler().WriteToken(token), _jwt.ExpiresInMinutes * 60);
     }
-
-    private static string GenerateRefreshToken() =>
-        Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
 }

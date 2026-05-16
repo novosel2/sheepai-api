@@ -32,7 +32,6 @@ public static class ConfigureServicesExtension
             opt.Issuer                = config["JWT_ISSUER"]             ?? string.Empty;
             opt.Audience              = config["JWT_AUDIENCE"]           ?? string.Empty;
             opt.ExpiresInMinutes      = config.GetValue<int>("JWT_EXPIRES_MINUTES",      10080); // 7 days
-            opt.RefreshTokenExpiryDays = config.GetValue<int>("JWT_REFRESH_EXPIRY_DAYS", 7);
         });
         services.Configure<ClaudeOptions>(opt =>
         {
