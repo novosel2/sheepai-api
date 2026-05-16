@@ -80,7 +80,7 @@ public sealed class ChatService(
             fileIds = await cacheService.GetOrSetAsync(
                 FileIdsCacheKey,
                 () => db.Files.Select(f => f.AnthropicFileId).ToListAsync(ct),
-                TimeSpan.FromMinutes(cacheTtl.Value.VeryLong),
+                TimeSpan.FromMinutes(cacheTtl.Value.Short),
                 ct);
         }
         catch (Exception ex)
