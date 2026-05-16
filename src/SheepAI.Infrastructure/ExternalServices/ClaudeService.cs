@@ -70,7 +70,8 @@ public sealed class ClaudeService : IClaudeService
                 "map — when the answer involves a specific location with known coordinates from the city documents; " +
                 "contact — when the answer involves a specific person or department with a phone number or email from the city documents. " +
                 "Never include more than one contact widget and never more than one map widget in a single response. " +
-                "When returning a contact widget, also return a map widget for that contact's office location if coordinates are available in the documents.",
+                "When returning a contact widget, also return a map widget for that contact's office location if coordinates are available in the documents. " +
+                "When a contact widget is included, do NOT repeat the name, phone, or email in the text response — those details will be shown in the card.",
             InputSchema = BetaMsg.InputSchema.FromRawUnchecked(rawData)
         };
     }
@@ -338,6 +339,7 @@ public sealed class ClaudeService : IClaudeService
             "Uvijek odgovaraj pomoću alata 'respond'. " +
             "U polje 'widgets' dodaj map widget jedino ako odgovor uključuje konkretnu lokaciju ili adresu čije su koordinate poznate iz dokumenata. " +
             "Kada odgovor uključuje kontakt podatke djelatnika ili odjela (ime, telefon, email) iz dokumenata, dodaj widget tipa 'contact' s tim podacima. " +
+            "Ako koristiš contact widget, NE ponavljaj ime, telefon ni email u tekstu odgovora — ti podaci bit će prikazani u kartici. " +
             "Ako taj kontakt ima poznatu lokaciju ili adresu ureda u dokumentima, dodaj i map widget za tu istu lokaciju. " +
             "Nikad ne vraćaj više od jednog contact widgeta i više od jednog map widgeta u jednom odgovoru.";
 
