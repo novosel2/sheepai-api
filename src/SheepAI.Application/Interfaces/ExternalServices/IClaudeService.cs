@@ -39,6 +39,12 @@ public interface IClaudeService
     Task<string> GenerateChatSummaryAsync(IReadOnlyList<(string Role, string Content)> history, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns true if the AI response indicates it had no information to answer the citizen's question.
+    /// Intended to be called in the background so the chat can be flagged urgent for admin attention.
+    /// </summary>
+    Task<bool> CheckIfUnansweredAsync(string aiResponse, CancellationToken ct = default);
+
+    /// <summary>
     /// Checks whether a conversation is urgent and needs admin attention.
     /// Intended to be called in the background after the chat response has already been returned.
     /// </summary>

@@ -146,6 +146,34 @@ public sealed class ClaudeService : IClaudeService
         return summary;
     }
 
+    public async Task<bool> CheckIfUnansweredAsync(string aiResponse, CancellationToken ct = default)
+    {
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug("Checking if AI response indicates missing information");
+
+        var prompt =
+            "Analizaj sljedeći odgovor AI asistenta. " +
+            "Je li asistent izjavio da nema informaciju ili da ne može odgovoriti na pitanje građanina?\n\n" +
+            $"Odgovor asistenta:\n{aiResponse}\n\n" +
+            "Odgovori SAMO riječju \"yes\" ako asistent nije imao informaciju, ili \"no\" ako jest odgovorio.";
+
+        var response = await _client.Messages.Create(new MessageCreateParams
+        {
+            Model     = _options.DefaultModel,
+            MaxTokens = 5,
+            Messages  = [new MessageParam { Role = Role.User, Content = prompt }]
+        }, ct);
+
+        var answer = response.Content
+            .Select(b => b.Value)
+            .OfType<TextBlock>()
+            .FirstOrDefault()?.Text ?? string.Empty;
+
+        var unanswered = answer.Contains("yes", StringComparison.OrdinalIgnoreCase);
+        _logger.LogInformation("Unanswered check result: {Result}", unanswered ? "unanswered" : "answered");
+        return unanswered;
+    }
+
     public async Task<bool> CheckUrgencyAsync(
         IReadOnlyList<(string Role, string Content)> history,
         CancellationToken ct = default)
