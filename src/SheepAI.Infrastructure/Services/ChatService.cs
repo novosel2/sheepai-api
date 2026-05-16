@@ -90,6 +90,9 @@ public sealed class ChatService(
         db.ChatMessages.Add(assistantMsg);
         await db.SaveChangesAsync(ct);
 
+        if (chat.Name is null)
+            _ = GenerateAndSaveChatNameAsync(chatId, content);
+
         if (!chat.IsUrgent)
         {
             var historyForUrgency = history
@@ -108,7 +111,30 @@ public sealed class ChatService(
             .FirstOrDefaultAsync(c => c.Id == chatId, ct)
             ?? throw new NotFoundException($"Chat {chatId} not found.");
 
-        return new ChatStatusResponse(chat.IsAdminTaken);
+        return new ChatStatusResponse(chat.Name, chat.IsAdminTaken);
+    }
+
+    private async Task GenerateAndSaveChatNameAsync(Guid chatId, string firstMessage)
+    {
+        try
+        {
+            var name = await claudeService.GenerateChatNameAsync(firstMessage);
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var scopedDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var chat = await scopedDb.Chats.FindAsync(chatId);
+            if (chat is { Name: null })
+            {
+                chat.Name = name;
+                await scopedDb.SaveChangesAsync();
+                logger.LogInformation("Chat {ChatId} named: {Name}", chatId, name);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Background name generation failed for chat {ChatId}", chatId);
+        }
     }
 
     private async Task CheckAndUpdateUrgencyAsync(Guid chatId, List<(string Role, string Content)> history)

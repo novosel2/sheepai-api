@@ -79,6 +79,33 @@ public sealed class ClaudeService : IClaudeService
         _logger.LogInformation("Document deleted from Files API: {FileId}", fileId);
     }
 
+    public async Task<string> GenerateChatNameAsync(string firstMessage, CancellationToken ct = default)
+    {
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug("Generating chat name for first message");
+
+        var prompt =
+            "Na temelju prve poruke građanina, osmisli kratki naziv razgovora (najviše 6 riječi). " +
+            "Naziv treba biti jasan i opisivati temu pitanja. " +
+            "Odgovori SAMO nazivom, bez navodnika ili ikakvih dodatnih objašnjenja.\n\n" +
+            $"Poruka: {firstMessage}";
+
+        var response = await _client.Messages.Create(new MessageCreateParams
+        {
+            Model     = _options.DefaultModel,
+            MaxTokens = 20,
+            Messages  = [new MessageParam { Role = Role.User, Content = prompt }]
+        }, ct);
+
+        var name = response.Content
+            .Select(b => b.Value)
+            .OfType<TextBlock>()
+            .FirstOrDefault()?.Text?.Trim() ?? string.Empty;
+
+        _logger.LogInformation("Generated chat name: {Name}", name);
+        return name;
+    }
+
     public async Task<bool> CheckUrgencyAsync(
         IReadOnlyList<(string Role, string Content)> history,
         CancellationToken ct = default)

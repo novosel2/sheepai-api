@@ -27,6 +27,12 @@ public interface IClaudeService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Generates a short display name (≤ 6 words) for a chat session based on the user's first message.
+    /// Intended to be called in the background after the first response has been returned.
+    /// </summary>
+    Task<string> GenerateChatNameAsync(string firstMessage, CancellationToken ct = default);
+
+    /// <summary>
     /// Checks whether a conversation is urgent and needs admin attention.
     /// Intended to be called in the background after the chat response has already been returned.
     /// </summary>

@@ -2,6 +2,7 @@ namespace SheepAI.Application.DTOs.Responses.Admin;
 
 public sealed record ChatResponse(
     Guid Id,
+    string? Name,
     DateTime CreatedAt,
     bool IsUrgent,
     bool IsAdminTaken,
