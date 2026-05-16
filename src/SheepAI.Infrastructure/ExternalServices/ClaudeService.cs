@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text.Json;
 using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
@@ -17,6 +18,55 @@ public sealed class ClaudeService : IClaudeService
     private readonly AnthropicClient _client;
     private readonly ClaudeOptions _options;
     private readonly ILogger<ClaudeService> _logger;
+
+    // Forced tool used to get structured output (text + optional widgets) from every chat call.
+    private static readonly BetaMsg.BetaTool RespondTool = BuildRespondTool();
+
+    private static BetaMsg.BetaTool BuildRespondTool()
+    {
+        const string schemaJson = """
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Your response to the user"
+                },
+                "widgets": {
+                  "type": "array",
+                  "description": "Optional visual widgets. Include a map widget when the answer involves a specific address or location with known coordinates from the documents.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": { "type": "string", "enum": ["map"] },
+                      "config": {
+                        "type": "object",
+                        "properties": {
+                          "lat": { "type": "number", "description": "Latitude" },
+                          "lng": { "type": "number", "description": "Longitude" }
+                        },
+                        "required": ["lat", "lng"]
+                      }
+                    },
+                    "required": ["type", "config"]
+                  }
+                }
+              },
+              "required": ["text"]
+            }
+            """;
+
+        var rawData = JsonDocument.Parse(schemaJson).RootElement
+            .EnumerateObject()
+            .ToDictionary(p => p.Name, p => p.Value);
+
+        return new BetaMsg.BetaTool
+        {
+            Name        = "respond",
+            Description = "Respond to the user. Always include a text response. Add a map widget only when the answer involves a specific location with known coordinates from the city documents.",
+            InputSchema = BetaMsg.InputSchema.FromRawUnchecked(rawData)
+        };
+    }
 
     public ClaudeService(IOptions<ClaudeOptions> options, ILogger<ClaudeService> logger)
     {
@@ -277,7 +327,9 @@ public sealed class ClaudeService : IClaudeService
             "Uvijek odgovaraj na jeziku kojim je korisnik napisao svoju poruku — " +
             "ako piše na engleskom, odgovori na engleskom; itd. " +
             "Ako korisnik piše nekim jezikom koji je sličan ili blizak hrvatskom, uvijek odgovaraj na hrvatskom. " +
-            "Odgovaraj jasno i ljubazno.";
+            "Odgovaraj jasno i ljubazno. " +
+            "Uvijek odgovaraj pomoću alata 'respond'. " +
+            "U polje 'widgets' dodaj map widget jedino ako odgovor uključuje konkretnu lokaciju ili adresu čije su koordinate poznate iz dokumenata.";
 
         List<BetaMsg.BetaTextBlockParam> systemBlocks =
         [
@@ -286,17 +338,35 @@ public sealed class ClaudeService : IClaudeService
 
         var response = await _client.Beta.Messages.Create(new BetaMsg.MessageCreateParams
         {
-            Model     = _options.DefaultModel,
-            MaxTokens = _options.MaxTokens,
-            System    = systemBlocks,
-            Messages  = messages,
-            Betas     = ["files-api-2025-04-14"]
+            Model      = _options.DefaultModel,
+            MaxTokens  = _options.MaxTokens,
+            System     = systemBlocks,
+            Messages   = messages,
+            Tools      = [new BetaMsg.BetaToolUnion(RespondTool, null)],
+            ToolChoice = new BetaMsg.BetaToolChoice(new BetaMsg.BetaToolChoiceTool { Name = "respond" }, null),
+            Betas      = ["files-api-2025-04-14"]
         }, ct);
 
-        var text = response.Content
+        var toolUse = response.Content
             .Select(b => b.Value)
-            .OfType<BetaMsg.BetaTextBlock>()
-            .FirstOrDefault()?.Text ?? string.Empty;
+            .OfType<BetaMsg.BetaToolUseBlock>()
+            .FirstOrDefault();
+
+        var text = string.Empty;
+        string? widgetsJson = null;
+
+        if (toolUse is not null)
+        {
+            if (toolUse.Input.TryGetValue("text", out var textEl))
+                text = textEl.GetString() ?? string.Empty;
+
+            if (toolUse.Input.TryGetValue("widgets", out var widgetsEl)
+                && widgetsEl.ValueKind == JsonValueKind.Array
+                && widgetsEl.GetArrayLength() > 0)
+            {
+                widgetsJson = widgetsEl.GetRawText();
+            }
+        }
 
         _logger.LogInformation("ChatWithDocuments complete ({InputTokens} in, {OutputTokens} out)",
             response.Usage.InputTokens, response.Usage.OutputTokens);
@@ -304,6 +374,7 @@ public sealed class ClaudeService : IClaudeService
         return new ClaudeResult(
             text,
             (int)response.Usage.InputTokens,
-            (int)response.Usage.OutputTokens);
+            (int)response.Usage.OutputTokens,
+            widgetsJson);
     }
 }

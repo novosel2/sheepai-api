@@ -47,7 +47,7 @@ public sealed class ChatService(
         return messages.Select(MapToResponse).ToList();
     }
 
-    public async Task<MessageResponse?> SendMessageAsync(Guid chatId, string content, CancellationToken ct = default)
+    public async Task<List<MessageResponse>?> SendMessageAsync(Guid chatId, string content, CancellationToken ct = default)
     {
         var chat = await db.Chats
             .FirstOrDefaultAsync(c => c.Id == chatId, ct)
@@ -71,7 +71,7 @@ public sealed class ChatService(
         }
 
         var history = await db.ChatMessages
-            .Where(m => m.ChatId == chatId)
+            .Where(m => m.ChatId == chatId && m.Role != "widget")
             .OrderByDescending(m => m.CreatedAt)
             .Take(50)
             .OrderBy(m => m.CreatedAt)
@@ -103,6 +103,14 @@ public sealed class ChatService(
 
         var assistantMsg = new ChatMessage { ChatId = chatId, Role = "assistant", Content = claudeResult.Text };
         db.ChatMessages.Add(assistantMsg);
+
+        ChatMessage? widgetMsg = null;
+        if (claudeResult.WidgetsJson is not null)
+        {
+            widgetMsg = new ChatMessage { ChatId = chatId, Role = "widget", Content = claudeResult.WidgetsJson };
+            db.ChatMessages.Add(widgetMsg);
+        }
+
         await db.SaveChangesAsync(ct);
 
         var fullHistory = historyTuples
@@ -113,14 +121,16 @@ public sealed class ChatService(
         if (chat.Name is null)
             _ = GenerateAndSaveChatNameAsync(chatId, content);
 
-
         if (fullHistory.Count >= 2)
             _ = GenerateAndSaveChatSummaryAsync(chatId, fullHistory);
 
         if (!chat.IsUrgent)
             _ = CheckAndUpdateUrgencyAsync(chatId, fullHistory);
 
-        return MapToResponse(assistantMsg);
+        var responses = new List<MessageResponse> { MapToResponse(assistantMsg) };
+        if (widgetMsg is not null)
+            responses.Add(MapToResponse(widgetMsg));
+        return responses;
     }
 
     public async Task<ChatStatusResponse> GetStatusAsync(Guid chatId, CancellationToken ct = default)

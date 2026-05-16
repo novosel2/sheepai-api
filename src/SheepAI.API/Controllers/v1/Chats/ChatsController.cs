@@ -31,19 +31,20 @@ public sealed class ChatsController(IChatService chatService) : ControllerBase
     }
 
     /// <summary>
-    /// Sends a user message and returns the AI response.
-    /// If an admin has taken over this chat, returns the saved user message instead
-    /// (no AI response is generated; the citizen waits for the admin to reply manually).
+    /// Sends a user message and returns the AI response(s).
+    /// Returns a list with one item for a plain text response, or two items when Claude includes a widget
+    /// (first is <c>role=assistant</c> with the text, second is <c>role=widget</c> with widget JSON as content).
+    /// If an admin has taken over this chat, returns 204 (no AI response is generated).
     /// </summary>
     [HttpPost("{chatId:guid}/messages")]
-    [ProducesResponseType<ApiResponse<MessageResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiResponse<List<MessageResponse>>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SendMessage(Guid chatId, [FromBody] SendMessageRequest request, CancellationToken ct)
     {
-        var response = await chatService.SendMessageAsync(chatId, request.Content, ct);
-        return response is null ? NoContent() : Ok(Api.Data("Message sent.", response));
+        var responses = await chatService.SendMessageAsync(chatId, request.Content, ct);
+        return responses is null ? NoContent() : Ok(Api.Data("Message sent.", responses));
     }
 
     /// <summary>Marks the chat as finished. Idempotent — safe to call multiple times.</summary>
