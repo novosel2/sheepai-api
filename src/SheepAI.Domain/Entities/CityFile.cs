@@ -8,5 +8,6 @@ public sealed class CityFile
     public Guid Id { get; init; } = Guid.NewGuid();
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public required string Name { get; set; }
+    public string Category { get; set; } = "General";
     public required string AnthropicFileId { get; init; }
 }

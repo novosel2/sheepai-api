@@ -30,6 +30,7 @@ public sealed class FileService(
         string fileName,
         string contentType,
         string displayName,
+        string category,
         long sizeBytes,
         CancellationToken ct = default)
     {
@@ -41,6 +42,7 @@ public sealed class FileService(
         var cityFile = new CityFile
         {
             Name            = displayName,
+            Category        = category,
             AnthropicFileId = uploadResult.FileId
         };
         db.Files.Add(cityFile);
@@ -66,7 +68,7 @@ public sealed class FileService(
     }
 
     private static FileResponse MapToResponse(CityFile f) =>
-        new(f.Id, f.Name, f.AnthropicFileId, f.CreatedAt);
+        new(f.Id, f.Name, f.Category, f.AnthropicFileId, f.CreatedAt);
 
     private ILogger<FileService> _logger => logger;
 }

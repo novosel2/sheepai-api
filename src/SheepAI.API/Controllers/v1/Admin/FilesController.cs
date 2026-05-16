@@ -39,7 +39,7 @@ public sealed class FilesController(IFileService fileService) : ControllerBase
     [ProducesResponseType<ApiResponse<FileResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Upload(IFormFile file, [FromForm] string name, CancellationToken ct)
+    public async Task<IActionResult> Upload(IFormFile file, [FromForm] string name, [FromForm] string category, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
             throw new ValidationException("A non-empty file is required.");
@@ -51,8 +51,11 @@ public sealed class FilesController(IFileService fileService) : ControllerBase
         if (string.IsNullOrWhiteSpace(name))
             throw new ValidationException("Display name is required.");
 
+        if (string.IsNullOrWhiteSpace(category))
+            throw new ValidationException("Category is required.");
+
         await using var stream = file.OpenReadStream();
-        var result = await fileService.UploadAsync(stream, file.FileName, contentType, name, file.Length, ct);
+        var result = await fileService.UploadAsync(stream, file.FileName, contentType, name, category, file.Length, ct);
         return Ok(Api.Data("File uploaded.", result));
     }
 

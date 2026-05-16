@@ -64,6 +64,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasKey(f => f.Id);
             e.Property(f => f.CreatedAt).IsRequired();
             e.Property(f => f.Name).IsRequired();
+            e.Property(f => f.Category).IsRequired().HasDefaultValue("General");
             e.Property(f => f.AnthropicFileId).IsRequired();
             e.HasIndex(f => f.AnthropicFileId).IsUnique();
         });
