@@ -120,11 +120,11 @@ public sealed class ClaudeService : IClaudeService
             $"{(h.Role == "user" ? "Građanin" : "Asistent")}: {h.Content}"));
 
         var prompt =
-            "Napiši sažetak sljedećeg razgovora između građanina i gradskog AI asistenta u 1-2 rečenice. " +
-            "Sažetak treba opisivati o čemu se radilo i je li problem riješen.\n\n" +
+            "Na temelju sljedećeg razgovora, napiši 1-2 rečenice koje opisuju što građanin traži ili želi. " +
+            "Fokusiraj se isključivo na zahtjev ili problem građanina — ne na to je li AI pronašao odgovor.\n\n" +
             "Ako razgovor ne sadrži nikakav smislen zahtjev (npr. samo pozdravi, uvrede ili besmislice), " +
             "odgovori SAMO riječju \"SKIP\" i ničim drugim.\n\n" +
-            "Inače odgovori SAMO sažetkom, bez uvoda ili dodatnih komentara.\n\n" +
+            "Inače odgovori SAMO opisom zahtjeva, bez uvoda ili dodatnih komentara.\n\n" +
             $"Razgovor:\n{transcript}";
 
         var response = await _client.Messages.Create(new MessageCreateParams
