@@ -12,6 +12,7 @@ namespace SheepAI.Infrastructure.Services;
 public sealed class FileService(
     AppDbContext db,
     IClaudeService claudeService,
+    ICacheService cacheService,
     ILogger<FileService> logger) : IFileService
 {
     public async Task<List<FileResponse>> GetAllAsync(CancellationToken ct = default)
@@ -39,11 +40,12 @@ public sealed class FileService(
 
         var cityFile = new CityFile
         {
-            Name             = displayName,
-            AnthropicFileId  = uploadResult.FileId
+            Name            = displayName,
+            AnthropicFileId = uploadResult.FileId
         };
         db.Files.Add(cityFile);
         await db.SaveChangesAsync(ct);
+        await cacheService.RemoveAsync(ChatService.FileIdsCacheKey, ct);
 
         logger.LogInformation("File uploaded: {DisplayName} → Anthropic ID {AnthropicFileId}", displayName, uploadResult.FileId);
         return MapToResponse(cityFile);
@@ -58,6 +60,7 @@ public sealed class FileService(
 
         db.Files.Remove(cityFile);
         await db.SaveChangesAsync(ct);
+        await cacheService.RemoveAsync(ChatService.FileIdsCacheKey, ct);
 
         logger.LogInformation("File deleted: {DisplayName} (Anthropic ID {AnthropicFileId})", cityFile.Name, cityFile.AnthropicFileId);
     }

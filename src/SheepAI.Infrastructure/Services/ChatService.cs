@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SheepAI.Application.DTOs.Responses.Chats;
 using SheepAI.Application.Interfaces.ExternalServices;
 using SheepAI.Application.Interfaces.Services;
+using SheepAI.Application.Options;
 using SheepAI.Domain.Entities;
 using SheepAI.Domain.Exceptions;
 using SheepAI.Infrastructure.Persistence;
@@ -13,9 +15,12 @@ namespace SheepAI.Infrastructure.Services;
 public sealed class ChatService(
     AppDbContext db,
     IClaudeService claudeService,
+    ICacheService cacheService,
     IServiceScopeFactory scopeFactory,
+    IOptions<CacheTtlOptions> cacheTtl,
     ILogger<ChatService> logger) : IChatService
 {
+    internal const string FileIdsCacheKey = "files:anthropic-ids";
     public async Task<CreateChatResponse> CreateChatAsync(CancellationToken ct = default)
     {
         var chat = new Chat();
@@ -67,9 +72,11 @@ public sealed class ChatService(
             .Select(m => (m.Role, m.Content))
             .ToList();
 
-        var fileIds = await db.Files
-            .Select(f => f.AnthropicFileId)
-            .ToListAsync(ct);
+        var fileIds = await cacheService.GetOrSetAsync(
+            FileIdsCacheKey,
+            () => db.Files.Select(f => f.AnthropicFileId).ToListAsync(ct),
+            TimeSpan.FromMinutes(cacheTtl.Value.VeryLong),
+            ct);
 
         if (_logger.IsEnabled(LogLevel.Debug))
             _logger.LogDebug("Calling Claude for chat {ChatId} with {FileCount} docs and {HistoryCount} history turns",
