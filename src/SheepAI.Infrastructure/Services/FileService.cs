@@ -47,7 +47,7 @@ public sealed class FileService(
         };
         db.Files.Add(cityFile);
         await db.SaveChangesAsync(ct);
-        await cacheService.RemoveAsync(ChatService.FileIdsCacheKey, ct);
+        await TryInvalidateFileIdsCacheAsync();
 
         logger.LogInformation("File uploaded: {DisplayName} → Anthropic ID {AnthropicFileId}", displayName, uploadResult.FileId);
         return MapToResponse(cityFile);
@@ -62,9 +62,21 @@ public sealed class FileService(
 
         db.Files.Remove(cityFile);
         await db.SaveChangesAsync(ct);
-        await cacheService.RemoveAsync(ChatService.FileIdsCacheKey, ct);
+        await TryInvalidateFileIdsCacheAsync();
 
         logger.LogInformation("File deleted: {DisplayName} (Anthropic ID {AnthropicFileId})", cityFile.Name, cityFile.AnthropicFileId);
+    }
+
+    private async Task TryInvalidateFileIdsCacheAsync()
+    {
+        try
+        {
+            await cacheService.RemoveAsync(ChatService.FileIdsCacheKey);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to invalidate file IDs cache; it will expire naturally");
+        }
     }
 
     private static FileResponse MapToResponse(CityFile f) =>

@@ -74,11 +74,20 @@ public sealed class ChatService(
             .Select(m => (m.Role, m.Content))
             .ToList();
 
-        var fileIds = await cacheService.GetOrSetAsync(
-            FileIdsCacheKey,
-            () => db.Files.Select(f => f.AnthropicFileId).ToListAsync(ct),
-            TimeSpan.FromMinutes(cacheTtl.Value.VeryLong),
-            ct);
+        List<string> fileIds;
+        try
+        {
+            fileIds = await cacheService.GetOrSetAsync(
+                FileIdsCacheKey,
+                () => db.Files.Select(f => f.AnthropicFileId).ToListAsync(ct),
+                TimeSpan.FromMinutes(cacheTtl.Value.VeryLong),
+                ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Cache unavailable; fetching file IDs directly from DB");
+            fileIds = await db.Files.Select(f => f.AnthropicFileId).ToListAsync(ct);
+        }
 
         if (_logger.IsEnabled(LogLevel.Debug))
             _logger.LogDebug("Calling Claude for chat {ChatId} with {FileCount} docs and {HistoryCount} history turns",
