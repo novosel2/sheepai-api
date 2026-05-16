@@ -7,6 +7,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Chat> Chats => Set<Chat>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<CityFile> Files => Set<CityFile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +34,38 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(rt => rt.Token).IsUnique();
             e.Property(rt => rt.ExpiresAt).IsRequired();
             e.Property(rt => rt.CreatedAt).IsRequired();
+        });
+
+        modelBuilder.Entity<Chat>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.CreatedAt).IsRequired();
+            e.Property(c => c.IsUrgent).IsRequired().HasDefaultValue(false);
+            e.Property(c => c.IsAdminTaken).IsRequired().HasDefaultValue(false);
+            e.Property(c => c.LastMessageAt).IsRequired();
+
+            e.HasMany(c => c.Messages)
+                .WithOne(m => m.Chat)
+                .HasForeignKey(m => m.ChatId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatMessage>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.Property(m => m.CreatedAt).IsRequired();
+            e.Property(m => m.Role).IsRequired();
+            e.Property(m => m.Content).IsRequired();
+        });
+
+        modelBuilder.Entity<CityFile>(e =>
+        {
+            e.ToTable("files");
+            e.HasKey(f => f.Id);
+            e.Property(f => f.CreatedAt).IsRequired();
+            e.Property(f => f.Name).IsRequired();
+            e.Property(f => f.AnthropicFileId).IsRequired();
+            e.HasIndex(f => f.AnthropicFileId).IsUnique();
         });
 
         base.OnModelCreating(modelBuilder);
