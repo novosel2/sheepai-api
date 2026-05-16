@@ -34,18 +34,20 @@ public sealed class ClaudeService : IClaudeService
                 },
                 "widgets": {
                   "type": "array",
-                  "description": "Optional visual widgets. Include a map widget when the answer involves a specific address or location with known coordinates from the documents.",
+                  "description": "Optional visual widgets. Use map for locations, contact for people/departments with contact info.",
                   "items": {
                     "type": "object",
                     "properties": {
-                      "type": { "type": "string", "enum": ["map"] },
+                      "type": { "type": "string", "enum": ["map", "contact"] },
                       "config": {
                         "type": "object",
                         "properties": {
-                          "lat": { "type": "number", "description": "Latitude" },
-                          "lng": { "type": "number", "description": "Longitude" }
-                        },
-                        "required": ["lat", "lng"]
+                          "lat":   { "type": "number", "description": "Latitude — map widget only" },
+                          "lng":   { "type": "number", "description": "Longitude — map widget only" },
+                          "name":  { "type": "string", "description": "Full name of the person or department — contact widget only" },
+                          "phone": { "type": "string", "description": "Phone number — contact widget only" },
+                          "email": { "type": "string", "description": "Email address — contact widget only" }
+                        }
                       }
                     },
                     "required": ["type", "config"]
@@ -63,7 +65,10 @@ public sealed class ClaudeService : IClaudeService
         return new BetaMsg.BetaTool
         {
             Name        = "respond",
-            Description = "Respond to the user. Always include a text response. Add a map widget only when the answer involves a specific location with known coordinates from the city documents.",
+            Description =
+                "Respond to the user. Always include a text response. Add widgets only when relevant: " +
+                "map — when the answer involves a specific location with known coordinates from the city documents; " +
+                "contact — when the answer involves a specific person or department with a phone number or email from the city documents.",
             InputSchema = BetaMsg.InputSchema.FromRawUnchecked(rawData)
         };
     }
@@ -329,7 +334,8 @@ public sealed class ClaudeService : IClaudeService
             "Ako korisnik piše nekim jezikom koji je sličan ili blizak hrvatskom, uvijek odgovaraj na hrvatskom. " +
             "Odgovaraj jasno i ljubazno. " +
             "Uvijek odgovaraj pomoću alata 'respond'. " +
-            "U polje 'widgets' dodaj map widget jedino ako odgovor uključuje konkretnu lokaciju ili adresu čije su koordinate poznate iz dokumenata.";
+            "U polje 'widgets' dodaj map widget jedino ako odgovor uključuje konkretnu lokaciju ili adresu čije su koordinate poznate iz dokumenata. " +
+            "Kada odgovor uključuje kontakt podatke djelatnika ili odjela (ime, telefon, email) iz dokumenata, dodaj widget tipa 'contact' s tim podacima.";
 
         List<BetaMsg.BetaTextBlockParam> systemBlocks =
         [
