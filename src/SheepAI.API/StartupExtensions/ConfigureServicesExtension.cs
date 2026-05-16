@@ -96,14 +96,24 @@ public static class ConfigureServicesExtension
                 {
                     OnTokenValidated = async ctx =>
                     {
-                        var cache = ctx.HttpContext.RequestServices.GetRequiredService<ICacheService>();
-                        var jti   = ctx.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+                        var cache  = ctx.HttpContext.RequestServices.GetRequiredService<ICacheService>();
+                        var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<JwtBearerEvents>>();
+                        var jti    = ctx.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
 
                         if (!string.IsNullOrEmpty(jti))
                         {
-                            var blocked = await cache.GetAsync<bool?>($"blocklist:{jti}");
-                            if (blocked is true)
-                                ctx.Fail("Token has been revoked.");
+                            try
+                            {
+                                var blocked = await cache.GetAsync<bool?>($"blocklist:{jti}");
+                                if (blocked is true)
+                                    ctx.Fail("Token has been revoked.");
+                            }
+                            catch (Exception ex)
+                            {
+                                // Redis unavailable — fail open so a cache outage doesn't lock out all users.
+                                // Logged as a warning; revoked tokens may pass until Redis recovers.
+                                logger.LogWarning(ex, "Blocklist check failed for jti {Jti}; treating as not blocked", jti);
+                            }
                         }
                     }
                 };
