@@ -118,10 +118,7 @@ public sealed class ChatService(
             _ = GenerateAndSaveChatSummaryAsync(chatId, fullHistory);
 
         if (!chat.IsUrgent)
-        {
-            _ = CheckAndMarkUrgentIfUnansweredAsync(chatId, claudeResult.Text);
             _ = CheckAndUpdateUrgencyAsync(chatId, fullHistory);
-        }
 
         return MapToResponse(assistantMsg);
     }
@@ -195,29 +192,6 @@ public sealed class ChatService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Background name generation failed for chat {ChatId}", chatId);
-        }
-    }
-
-    private async Task CheckAndMarkUrgentIfUnansweredAsync(Guid chatId, string aiResponse)
-    {
-        try
-        {
-            var unanswered = await claudeService.CheckIfUnansweredAsync(aiResponse);
-            if (!unanswered) return;
-
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var scopedDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var chat = await scopedDb.Chats.FindAsync(chatId);
-            if (chat is { IsUrgent: false })
-            {
-                chat.IsUrgent = true;
-                await scopedDb.SaveChangesAsync();
-                logger.LogInformation("Chat {ChatId} flagged urgent — AI had no information to answer", chatId);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Background unanswered check failed for chat {ChatId}", chatId);
         }
     }
 

@@ -146,34 +146,6 @@ public sealed class ClaudeService : IClaudeService
         return summary;
     }
 
-    public async Task<bool> CheckIfUnansweredAsync(string aiResponse, CancellationToken ct = default)
-    {
-        if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("Checking if AI response indicates missing information");
-
-        var prompt =
-            "Analizaj sljedeći odgovor AI asistenta. " +
-            "Je li asistent izjavio da nema informaciju ili da ne može odgovoriti na pitanje građanina?\n\n" +
-            $"Odgovor asistenta:\n{aiResponse}\n\n" +
-            "Odgovori SAMO riječju \"yes\" ako asistent nije imao informaciju, ili \"no\" ako jest odgovorio.";
-
-        var response = await _client.Messages.Create(new MessageCreateParams
-        {
-            Model     = _options.DefaultModel,
-            MaxTokens = 5,
-            Messages  = [new MessageParam { Role = Role.User, Content = prompt }]
-        }, ct);
-
-        var answer = response.Content
-            .Select(b => b.Value)
-            .OfType<TextBlock>()
-            .FirstOrDefault()?.Text ?? string.Empty;
-
-        var unanswered = answer.Contains("yes", StringComparison.OrdinalIgnoreCase);
-        _logger.LogInformation("Unanswered check result: {Result}", unanswered ? "unanswered" : "answered");
-        return unanswered;
-    }
-
     public async Task<bool> CheckUrgencyAsync(
         IReadOnlyList<(string Role, string Content)> history,
         CancellationToken ct = default)
@@ -185,12 +157,12 @@ public sealed class ClaudeService : IClaudeService
             $"{(h.Role == "user" ? "Građanin" : "Asistent")}: {h.Content}"));
 
         var prompt =
-            "Procijeni je li sljedeći razgovor između građanina i gradskog AI asistenta hitan " +
-            "i zahtijeva li hitnu pažnju ljudskog administratora.\n\n" +
+            "Procijeni treba li sljedeći razgovor između građanina i gradskog AI asistenta hitnu pažnju ljudskog administratora.\n\n" +
             $"Razgovor:\n{transcript}\n\n" +
             "Odgovori SAMO riječju \"urgent\" ili \"not_urgent\". " +
-            "Hitno znači da osoba ima vremenski osjetljiv problem, da je u nevolji, " +
-            "ili da joj je potrebna neposredna pomoć čovjeka.";
+            "Označi kao hitno ako BILO KOJI od ovih uvjeta vrijedi:\n" +
+            "- Osoba ima vremenski osjetljiv problem, u je nevolji ili treba neposrednu pomoć čovjeka.\n" +
+            "- AI asistent je izjavio da nema informaciju ili ne može odgovoriti na pitanje građanina.";
 
         var response = await _client.Messages.Create(new MessageCreateParams
         {
