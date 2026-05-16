@@ -1,4 +1,5 @@
 using DotNetEnv;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 using SheepAI.API.Middleware;
 using SheepAI.API.StartupExtensions;
@@ -14,6 +15,13 @@ builder.Host.UseSerilog((ctx, lc) => lc
 builder.Services.ConfigureServices(builder.Configuration);
 
 var app = builder.Build();
+
+// Trust the Azure Container Apps proxy so RemoteIpAddress reflects the real client IP.
+// This is read by the per-IP rate limiter.
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 app.UseExceptionHandler();
 app.UseMiddleware<SecurityHeadersMiddleware>();
