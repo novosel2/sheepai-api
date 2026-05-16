@@ -110,4 +110,112 @@ public sealed class ClaudeService : IClaudeService
 
         _logger.LogInformation("Document deleted from Files API: {FileId}", fileId);
     }
+
+    public async Task<ClaudeResult> ChatWithDocumentsAsync(
+        IReadOnlyList<string> fileIds,
+        IReadOnlyList<(string Role, string Content)> history,
+        string userMessage,
+        CancellationToken ct = default)
+    {
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug("ChatWithDocuments — {FileCount} docs, {HistoryCount} prior turns", fileIds.Count, history.Count);
+
+        var messages = new List<BetaMsg.BetaMessageParam>();
+
+        // Inject all documents as the first turn so they are available for the whole conversation.
+        // Using cache_control ephemeral to enable prompt caching on the document blocks.
+        if (fileIds.Count > 0)
+        {
+            var docBlocks = new List<BetaMsg.BetaContentBlockParam>();
+            foreach (var id in fileIds)
+            {
+                BetaMsg.BetaRequestDocumentBlockSource src = new BetaMsg.BetaFileDocumentSource { FileID = id };
+                docBlocks.Add(new BetaMsg.BetaRequestDocumentBlock { Source = src });
+            }
+            docBlocks.Add(new BetaMsg.BetaTextBlockParam
+            {
+                Text = "Ovo su gradski dokumenti Grada Splita koji su ti na raspolaganju za odgovaranje na pitanja građana."
+            });
+
+            messages.Add(new BetaMsg.BetaMessageParam
+            {
+                Role    = "user",
+                Content = docBlocks
+            });
+            messages.Add(new BetaMsg.BetaMessageParam
+            {
+                Role    = "assistant",
+                Content = new List<BetaMsg.BetaContentBlockParam>
+                {
+                    new BetaMsg.BetaTextBlockParam { Text = "Razumijem. Koristit ću ove gradske dokumente za odgovaranje na pitanja." }
+                }
+            });
+        }
+
+        // Append conversation history, normalizing roles for the Anthropic API.
+        // Consecutive messages of the same role are merged to satisfy alternation requirement.
+        foreach (var (role, content) in history)
+        {
+            var apiRole = role is "assistant" or "admin" ? "assistant" : "user";
+            if (messages.Count > 0 && messages[^1].Role == apiRole)
+            {
+                // Merge into the previous message
+                var prev    = messages[^1];
+                var merged  = ((IEnumerable<BetaMsg.BetaContentBlockParam>)prev.Content!).ToList();
+                merged.Add(new BetaMsg.BetaTextBlockParam { Text = content });
+                messages[^1] = new BetaMsg.BetaMessageParam { Role = apiRole, Content = merged };
+            }
+            else
+            {
+                messages.Add(new BetaMsg.BetaMessageParam
+                {
+                    Role    = apiRole,
+                    Content = new List<BetaMsg.BetaContentBlockParam>
+                    {
+                        new BetaMsg.BetaTextBlockParam { Text = content }
+                    }
+                });
+            }
+        }
+
+        // Current user message
+        messages.Add(new BetaMsg.BetaMessageParam
+        {
+            Role    = "user",
+            Content = new List<BetaMsg.BetaContentBlockParam>
+            {
+                new BetaMsg.BetaTextBlockParam { Text = userMessage }
+            }
+        });
+
+        const string systemPrompt =
+            "Ti si AI asistent Grada Splita. Pomažeš građanima i turistima s pitanjima o gradskim uslugama, " +
+            "administrativnim zahtjevima i informacijama o gradu. " +
+            "Odgovaraj isključivo na temelju priloženih gradskih dokumenata. " +
+            "Ako odgovor nije dostupan u dokumentima, ljubazno obavijesti korisnika da nemaš tu informaciju " +
+            "i predloži da kontaktira gradske službe. " +
+            "Uvijek odgovaraj na hrvatskom jeziku, jasno i ljubazno.";
+
+        var response = await _client.Beta.Messages.Create(new BetaMsg.MessageCreateParams
+        {
+            Model     = _options.DefaultModel,
+            MaxTokens = _options.MaxTokens,
+            System    = systemPrompt,
+            Messages  = messages,
+            Betas     = ["files-api-2025-04-14"]
+        }, ct);
+
+        var text = response.Content
+            .Select(b => b.Value)
+            .OfType<BetaMsg.BetaTextBlock>()
+            .FirstOrDefault()?.Text ?? string.Empty;
+
+        _logger.LogInformation("ChatWithDocuments complete ({InputTokens} in, {OutputTokens} out)",
+            response.Usage.InputTokens, response.Usage.OutputTokens);
+
+        return new ClaudeResult(
+            text,
+            (int)response.Usage.InputTokens,
+            (int)response.Usage.OutputTokens);
+    }
 }

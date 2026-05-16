@@ -58,6 +58,7 @@ public static class ConfigureServicesExtension
 
         // Services
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IChatService, ChatService>();
         services.AddSingleton<IClaudeService, ClaudeService>();
 
         // CORS

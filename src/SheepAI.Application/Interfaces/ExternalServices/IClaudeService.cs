@@ -19,4 +19,16 @@ public interface IClaudeService
 
     /// <summary>Deletes a file from the Anthropic Files API.</summary>
     Task DeleteDocumentAsync(string fileId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs a multi-turn conversation grounded in the uploaded city documents.
+    /// <paramref name="fileIds"/> are Anthropic Files API IDs already on the server.
+    /// <paramref name="history"/> is the prior conversation ordered oldest-first; roles are
+    /// <c>"user"</c>, <c>"assistant"</c>, or <c>"admin"</c> (admin is treated as assistant).
+    /// </summary>
+    Task<ClaudeResult> ChatWithDocumentsAsync(
+        IReadOnlyList<string> fileIds,
+        IReadOnlyList<(string Role, string Content)> history,
+        string userMessage,
+        CancellationToken ct = default);
 }
