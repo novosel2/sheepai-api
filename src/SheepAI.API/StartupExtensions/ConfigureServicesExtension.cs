@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -109,16 +110,21 @@ public static class ConfigureServicesExtension
             });
         services.AddAuthorization();
 
-        // Rate limiting — fixed window
+        // Rate limiting — fixed window per IP
+        var permitLimit   = config.GetValue<int>("RATE_LIMIT_PERMIT", 20);
+        var windowSeconds = config.GetValue<int>("RATE_LIMIT_WINDOW_SECONDS", 60);
         services.AddRateLimiter(opt =>
         {
-            opt.AddFixedWindowLimiter("fixed", lim =>
-            {
-                lim.PermitLimit          = config.GetValue<int>("RATE_LIMIT_PERMIT", 20);
-                lim.Window               = TimeSpan.FromSeconds(config.GetValue<int>("RATE_LIMIT_WINDOW_SECONDS", 60));
-                lim.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-                lim.QueueLimit           = 0;
-            });
+            opt.AddPolicy("fixed", ctx =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit          = permitLimit,
+                        Window               = TimeSpan.FromSeconds(windowSeconds),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit           = 0
+                    }));
             opt.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
         });
 
