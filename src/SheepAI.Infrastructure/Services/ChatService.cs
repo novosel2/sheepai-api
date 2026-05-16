@@ -90,16 +90,18 @@ public sealed class ChatService(
         db.ChatMessages.Add(assistantMsg);
         await db.SaveChangesAsync(ct);
 
+        var fullHistory = history
+            .Append((Role: "user", Content: content))
+            .Append((Role: "assistant", Content: claudeResult.Text))
+            .ToList();
+
         if (chat.Name is null)
             _ = GenerateAndSaveChatNameAsync(chatId, content);
 
+        _ = GenerateAndSaveChatSummaryAsync(chatId, fullHistory);
+
         if (!chat.IsUrgent)
-        {
-            var historyForUrgency = history
-                .Append((Role: "user", Content: content))
-                .ToList();
-            _ = CheckAndUpdateUrgencyAsync(chatId, historyForUrgency);
-        }
+            _ = CheckAndUpdateUrgencyAsync(chatId, fullHistory);
 
         return MapToResponse(assistantMsg);
     }
@@ -111,7 +113,30 @@ public sealed class ChatService(
             .FirstOrDefaultAsync(c => c.Id == chatId, ct)
             ?? throw new NotFoundException($"Chat {chatId} not found.");
 
-        return new ChatStatusResponse(chat.Name, chat.IsAdminTaken);
+        return new ChatStatusResponse(chat.Name, chat.Summary, chat.IsAdminTaken);
+    }
+
+    private async Task GenerateAndSaveChatSummaryAsync(Guid chatId, List<(string Role, string Content)> history)
+    {
+        try
+        {
+            var summary = await claudeService.GenerateChatSummaryAsync(history);
+            if (string.IsNullOrWhiteSpace(summary)) return;
+
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var scopedDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var chat = await scopedDb.Chats.FindAsync(chatId);
+            if (chat is not null)
+            {
+                chat.Summary = summary;
+                await scopedDb.SaveChangesAsync();
+                logger.LogInformation("Chat {ChatId} summary updated", chatId);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Background summary generation failed for chat {ChatId}", chatId);
+        }
     }
 
     private async Task GenerateAndSaveChatNameAsync(Guid chatId, string firstMessage)

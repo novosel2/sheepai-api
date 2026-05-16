@@ -106,6 +106,36 @@ public sealed class ClaudeService : IClaudeService
         return name;
     }
 
+    public async Task<string> GenerateChatSummaryAsync(IReadOnlyList<(string Role, string Content)> history, CancellationToken ct = default)
+    {
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug("Generating chat summary for conversation with {TurnCount} turns", history.Count);
+
+        var transcript = string.Join("\n", history.Select(h =>
+            $"{(h.Role == "user" ? "Građanin" : "Asistent")}: {h.Content}"));
+
+        var prompt =
+            "Napiši sažetak sljedećeg razgovora između građanina i gradskog AI asistenta u 1-2 rečenice. " +
+            "Sažetak treba opisivati o čemu se radilo i je li problem riješen. " +
+            "Odgovori SAMO sažetkom, bez uvoda ili dodatnih komentara.\n\n" +
+            $"Razgovor:\n{transcript}";
+
+        var response = await _client.Messages.Create(new MessageCreateParams
+        {
+            Model     = _options.DefaultModel,
+            MaxTokens = 100,
+            Messages  = [new MessageParam { Role = Role.User, Content = prompt }]
+        }, ct);
+
+        var summary = response.Content
+            .Select(b => b.Value)
+            .OfType<TextBlock>()
+            .FirstOrDefault()?.Text?.Trim() ?? string.Empty;
+
+        _logger.LogInformation("Generated chat summary ({Length} chars)", summary.Length);
+        return summary;
+    }
+
     public async Task<bool> CheckUrgencyAsync(
         IReadOnlyList<(string Role, string Content)> history,
         CancellationToken ct = default)

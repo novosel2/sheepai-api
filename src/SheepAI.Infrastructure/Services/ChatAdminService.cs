@@ -53,5 +53,5 @@ public sealed class ChatAdminService(
     }
 
     private static ChatResponse MapToResponse(Chat c) =>
-        new(c.Id, c.Name, c.CreatedAt, c.IsUrgent, c.IsAdminTaken, c.LastMessageAt);
+        new(c.Id, c.Name, c.Summary, c.CreatedAt, c.IsUrgent, c.IsAdminTaken, c.LastMessageAt);
 }

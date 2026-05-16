@@ -33,6 +33,12 @@ public interface IClaudeService
     Task<string> GenerateChatNameAsync(string firstMessage, CancellationToken ct = default);
 
     /// <summary>
+    /// Generates a 1–2 sentence summary of the conversation so far.
+    /// Intended to be called in the background after each exchange.
+    /// </summary>
+    Task<string> GenerateChatSummaryAsync(IReadOnlyList<(string Role, string Content)> history, CancellationToken ct = default);
+
+    /// <summary>
     /// Checks whether a conversation is urgent and needs admin attention.
     /// Intended to be called in the background after the chat response has already been returned.
     /// </summary>
