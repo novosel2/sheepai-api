@@ -195,7 +195,8 @@ public sealed class ClaudeService : IClaudeService
             "Ako odgovor nije dostupan u dokumentima, ljubazno obavijesti korisnika da nemaš tu informaciju " +
             "i predloži da kontaktira gradske službe. " +
             "Uvijek odgovaraj na jeziku kojim je korisnik napisao svoju poruku — " +
-            "ako piše na hrvatskom, odgovori na hrvatskom; ako piše na engleskom, odgovori na engleskom; itd. " +
+            "ako piše na engleskom, odgovori na engleskom; itd. " +
+            "Ako korisnik piše nekim jezikom koji je sličan ili blizak hrvatskom, uvijek odgovaraj na hrvatskom. " +
             "Odgovaraj jasno i ljubazno.";
 
         var response = await _client.Beta.Messages.Create(new BetaMsg.MessageCreateParams
