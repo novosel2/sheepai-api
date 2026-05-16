@@ -33,14 +33,16 @@ public sealed class ChatService(
 
     public async Task<List<MessageResponse>> GetMessagesAsync(Guid chatId, CancellationToken ct = default)
     {
-        var exists = await db.Chats.AnyAsync(c => c.Id == chatId, ct);
-        if (!exists)
-            throw new NotFoundException($"Chat {chatId} not found.");
-
         var messages = await db.ChatMessages
             .Where(m => m.ChatId == chatId)
             .OrderBy(m => m.CreatedAt)
             .ToListAsync(ct);
+
+        // Common path (non-empty chat) costs one query.
+        // Only fall back to an existence check when the list is empty to distinguish
+        // "chat has no messages yet" from "chat does not exist".
+        if (messages.Count == 0 && !await db.Chats.AnyAsync(c => c.Id == chatId, ct))
+            throw new NotFoundException($"Chat {chatId} not found.");
 
         return messages.Select(MapToResponse).ToList();
     }
